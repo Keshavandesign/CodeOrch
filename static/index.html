@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SprintBoard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ── Auth Screen (full-page overlay, shown until logged in) ─────────────── -->
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">⚡</div>
+    <h1 class="auth-title">SprintBoard</h1>
+    <p class="auth-domain">thekasper.ai workspace</p>
+
+    <!-- Step 1: email only -->
+    <div id="authStep1" class="auth-step">
+      <div class="form-field">
+        <label>Work email</label>
+        <input type="email" id="authEmail" placeholder="you@thekasper.ai"
+               autocomplete="email" onkeydown="if(event.key==='Enter')authCheckEmail()">
+      </div>
+      <button class="btn-primary auth-btn" onclick="authCheckEmail()">Continue →</button>
+    </div>
+
+    <!-- Step 2: password (+ name for new accounts) -->
+    <div id="authStep2" class="auth-step" style="display:none">
+      <div class="auth-email-chip" id="authEmailChip"></div>
+
+      <div class="form-field" id="authNameField" style="display:none">
+        <label>Your name</label>
+        <input type="text" id="authName" placeholder="Your name"
+               onkeydown="if(event.key==='Enter')authSubmit()">
+        <span class="auth-hint">Welcome! What should we call you?</span>
+      </div>
+
+      <!-- Password field with strength (NEW USER ONLY) -->
+      <div class="form-field" id="authPasswordField">
+        <div class="password-label-row">
+          <label>Create a password</label>
+          <button type="button" class="auth-suggest-btn" id="authSuggestBtn" onclick="suggestPassword()" style="display:none">
+            ✨ Suggest
+          </button>
+        </div>
+        <div class="password-input-wrap">
+          <input type="password" id="authPassword" placeholder="At least 8 characters"
+                 autocomplete="new-password" oninput="onPasswordInput()">
+          <button type="button" class="password-toggle" id="authPasswordToggle" onclick="togglePasswordVisibility()">
+            👁️
+          </button>
+        </div>
+        <!-- Strength meter -->
+        <div class="password-strength" id="authPasswordStrength" style="display:none">
+          <div class="strength-bar">
+            <div class="strength-fill" id="authPasswordStrengthFill"></div>
+          </div>
+          <span class="strength-label" id="authPasswordStrengthLabel"></span>
+        </div>
+        <!-- Requirements checklist -->
+        <div class="password-requirements" id="authPasswordRequirements" style="display:none">
+          <span class="req-item" id="reqLength">✗ At least 8 characters</span>
+          <span class="req-item" id="reqCase">✗ Mix of upper & lowercase</span>
+          <span class="req-item" id="reqDigit">✗ At least one number</span>
+          <span class="req-item" id="reqSymbol">✗ At least one symbol (!@#$%)</span>
+        </div>
+      </div>
+
+      <!-- Confirm password (NEW USER ONLY) -->
+      <div class="form-field" id="authConfirmField" style="display:none">
+        <label>Confirm password</label>
+        <input type="password" id="authConfirmPassword" placeholder="Re-enter your password"
+               autocomplete="new-password" oninput="updateConfirmMatch()">
+        <span class="auth-hint" id="authConfirmHint" style="display:none"></span>
+      </div>
+
+      <button class="btn-primary auth-btn" id="authSubmitBtn" onclick="authSubmit()">Sign in</button>
+      <button class="auth-back" onclick="authGoBack()">← Use a different email</button>
+    </div>
+
+    <div id="authError" class="auth-error"></div>
+  </div>
+</div>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="nav-left">
+    <div class="brand" onclick="goHome()" style="cursor:pointer">⚡ SprintBoard</div>
+    <!-- Board-only: breadcrumb + sprint info -->
+    <span id="navBreadcrumb" class="nav-breadcrumb" style="display:none" onclick="goHome()">← All Sprints</span>
+    <div id="sprintInfo" class="sprint-info" style="display:none">
+      <span id="sprintName" class="sprint-name">Loading...</span>
+      <span id="sprintDates" class="sprint-dates"></span>
+    </div>
+  </div>
+  <div class="nav-right">
+    <button class="btn-ghost" id="usersBtn">👥 Team</button>
+    <!-- Board-only controls -->
+    <button class="btn-ghost" id="viewToggle" style="display:none">☰ List</button>
+    <button class="btn-primary" id="newTaskBtn" style="display:none">＋ New Task</button>
+    <!-- Always visible -->
+    <button class="btn-ghost" onclick="createNewSprint()">＋ Sprint</button>
+    <!-- Logged-in user chip (click avatar/name to open profile) -->
+    <div class="nav-user" id="navUser" style="display:none">
+      <span class="user-avatar nav-avatar nav-avatar-btn" id="navUserAvatar" onclick="openProfileModal()" title="Edit profile"></span>
+      <span class="nav-user-name nav-avatar-btn" id="navUserName" onclick="openProfileModal()" title="Edit profile"></span>
+      <button class="btn-ghost nav-signout" onclick="logout()">Sign out</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Stats bar (board view only) -->
+<div class="stats-bar" id="statsBar" style="display:none">
+  <div class="stat-item">
+    <span class="stat-num" id="statTotal">0</span>
+    <span class="stat-lbl">Tasks</span>
+  </div>
+  <div class="stat-sep"></div>
+  <div class="stat-item">
+    <span class="stat-num green" id="statCompleted">0</span>
+    <span class="stat-lbl">Completed</span>
+  </div>
+  <div class="stat-sep"></div>
+  <div class="stat-item">
+    <span class="stat-num red" id="statOverdue">0</span>
+    <span class="stat-lbl">Overdue</span>
+  </div>
+  <div class="stat-spacer"></div>
+  <div id="sprintProgress" class="sprint-progress-bar-wrap">
+    <div id="sprintProgressBar" class="sprint-progress-bar"></div>
+  </div>
+</div>
+
+<!-- Main content -->
+<main class="main-content">
+
+  <!-- Home View -->
+  <div id="homeView" style="display:none">
+    <div class="home-header">
+      <h1 class="home-title">All Sprints</h1>
+      <span class="home-subtitle" id="homeSubtitle"></span>
+    </div>
+    <div id="activeSprintSection" class="active-sprint-section"></div>
+    <div id="pastSprintsLabel" class="past-sprints-label" style="display:none">Past Sprints</div>
+    <div id="pastSprintsGrid" class="sprint-grid"></div>
+    <div id="noSprintsState" class="empty-state" style="display:none">
+      No sprints yet — create one with <strong>＋ Sprint</strong>
+    </div>
+  </div>
+
+  <!-- Kanban Board -->
+  <div id="kanbanView" class="kanban-board" style="display:none"></div>
+
+  <!-- List View -->
+  <div id="listView" class="list-view" style="display:none">
+    <div class="list-toolbar">
+      <button class="btn-primary" onclick="openTaskModal()">＋ Add Task</button>
+    </div>
+    <table class="task-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Assigned To</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Deadline</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="taskTableBody"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<!-- Task Modal -->
+<div id="taskModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modalTitle">New Task</h2>
+      <button class="modal-close" onclick="closeTaskModal()">×</button>
+    </div>
+    <form id="taskForm" onsubmit="saveTask(event)" autocomplete="off">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Title <span class="req">*</span></label>
+          <input type="text" id="taskTitle" placeholder="What needs to be done?">
+        </div>
+        <div class="form-field full">
+          <label>Description</label>
+          <textarea id="taskDescription" rows="3" placeholder="Add details..."></textarea>
+        </div>
+        <div class="form-field">
+          <label>Assigned To <span class="req">*</span></label>
+          <select id="taskUser"></select>
+        </div>
+        <div class="form-field">
+          <label>Status</label>
+          <select id="taskStatus"></select>
+        </div>
+        <div class="form-field">
+          <label>Priority</label>
+          <select id="taskPriority">
+            <option value="High">🔴 High</option>
+            <option value="Medium" selected>🟡 Medium</option>
+            <option value="Low">🟢 Low</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Deadline</label>
+          <input type="datetime-local" id="taskDeadline">
+        </div>
+      </div>
+      <div class="subtasks-block">
+        <div class="subtasks-header">
+          <span class="subtasks-label">Subtasks</span>
+          <button type="button" class="btn-sm" onclick="addSubtaskRow()">＋ Add</button>
+        </div>
+        <div id="subtasksList"></div>
+      </div>
+
+      <!-- Comments (only shown when editing an existing task) -->
+      <div class="comments-block" id="commentsBlock" style="display:none">
+        <div class="subtasks-header">
+          <span class="subtasks-label">💬 Comments</span>
+          <span class="comments-count" id="commentsCount"></span>
+        </div>
+        <div class="comments-list" id="commentsList"></div>
+        <div class="comment-compose">
+          <span class="user-avatar sm comment-compose-avatar" id="commentAvatar"></span>
+          <textarea id="commentInput" rows="2" placeholder="Write a comment… (⌘↵ to post)"
+                    onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey))submitComment()"></textarea>
+          <button type="button" class="btn-primary comment-post-btn" onclick="submitComment()">Post</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" onclick="closeTaskModal()">Cancel</button>
+        <button type="submit" class="btn-primary">Save Task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- User Modal -->
+<div id="userModal" class="modal-overlay">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <h2>Team Members</h2>
+      <button class="modal-close" onclick="closeUserModal()">×</button>
+    </div>
+    <div id="userList" class="user-list"></div>
+    <form id="addUserForm" onsubmit="addUser(event)">
+      <div class="divider-label">Add member</div>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Full Name</label>
+          <input type="text" id="newUserName" placeholder="Jane Doe">
+        </div>
+        <div class="form-field">
+          <label>Email</label>
+          <input type="email" id="newUserEmail" placeholder="jane@thekasper.ai">
+        </div>
+      </div>
+      <button type="submit" class="btn-primary">Add Member</button>
+    </form>
+  </div>
+</div>
+
+<!-- Profile Modal -->
+<div id="profileModal" class="modal-overlay">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <h2>Your Profile</h2>
+      <button class="modal-close" onclick="closeProfileModal()">×</button>
+    </div>
+    <div style="padding:1.25rem 1.5rem">
+      <div class="form-field" style="margin-bottom:1rem">
+        <label>Display Name</label>
+        <input type="text" id="profileName" placeholder="Your name">
+      </div>
+      <div class="form-field" style="margin-bottom:0.5rem">
+        <label>Slack Member ID
+          <span class="slack-id-hint">for direct message notifications</span>
+        </label>
+        <input type="text" id="profileSlackId" placeholder="e.g. U12345ABC">
+        <span class="auth-hint">Find in Slack → click your name → ⋯ → Copy member ID</span>
+      </div>
+      <div id="profileSlackStatus" class="slack-status" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-ghost" onclick="closeProfileModal()">Cancel</button>
+      <button type="button" class="btn-primary" onclick="saveProfile()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

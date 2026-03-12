@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: taskdb
+      POSTGRES_USER: taskuser
+      POSTGRES_PASSWORD: taskpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskuser -d taskdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://taskuser:taskpass@db:5432/taskdb
+      JWT_SECRET: "sprintboard-change-this-in-production-abc123xyz"
+      # ── Slack (paste your values here, leave blank to disable) ──
+      SLACK_WEBHOOK_URL: ""
+      SLACK_BOT_TOKEN: ""
+
+volumes:
+  postgres_data:
